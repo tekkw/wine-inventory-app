@@ -63,6 +63,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const sortedWines = useMemo(
     () =>
@@ -73,6 +74,23 @@ export default function App() {
       }),
     [wines],
   );
+
+  const wineNameSuggestions = useMemo(() => {
+    const keyword = form.wine_name.trim().toLocaleLowerCase();
+    if (!keyword) return [];
+
+    const uniqueNames = Array.from(
+      new Set(wines.map((wine) => wine.wine_name?.trim()).filter(Boolean)),
+    );
+
+    return uniqueNames
+      .filter((name) => name.toLocaleLowerCase().includes(keyword))
+      .sort((a, b) => a.localeCompare(b, 'ko'))
+      .slice(0, 5);
+  }, [form.wine_name, wines]);
+
+  const shouldShowSuggestions =
+    showSuggestions && form.wine_name.trim() && wineNameSuggestions.length > 0;
 
   useEffect(() => {
     loadWines();
@@ -122,6 +140,7 @@ export default function App() {
     } else {
       setWines((current) => [...current, data]);
       setForm(createEmptyForm());
+      setShowSuggestions(false);
       setMessage(text.addSuccess);
     }
     setIsSaving(false);
@@ -136,6 +155,7 @@ export default function App() {
       outgoing: String(wine.outgoing ?? 0),
     });
     setMessage('');
+    setShowSuggestions(false);
   }
 
   function cancelEdit() {
@@ -182,6 +202,11 @@ export default function App() {
     setIsSaving(false);
   }
 
+  function selectWineName(name) {
+    setForm((current) => ({ ...current, wine_name: name }));
+    setShowSuggestions(false);
+  }
+
   function renderTextInput(label, value, onChange, type = 'text') {
     return (
       <label>
@@ -192,6 +217,40 @@ export default function App() {
           onChange={(event) => onChange(event.target.value)}
           required
         />
+      </label>
+    );
+  }
+
+  function renderWineNameInput() {
+    return (
+      <label className="autocomplete-field">
+        <span>{text.wineName}</span>
+        <input
+          type="text"
+          value={form.wine_name}
+          onBlur={() => window.setTimeout(() => setShowSuggestions(false), 120)}
+          onChange={(event) => {
+            setForm((current) => ({ ...current, wine_name: event.target.value }));
+            setShowSuggestions(Boolean(event.target.value.trim()));
+          }}
+          onFocus={() => setShowSuggestions(Boolean(form.wine_name.trim()))}
+          required
+        />
+        {shouldShowSuggestions && (
+          <div className="autocomplete-list" role="listbox" aria-label="와인명 자동완성">
+            {wineNameSuggestions.map((name) => (
+              <button
+                className="autocomplete-option"
+                key={name}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectWineName(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
       </label>
     );
   }
@@ -239,9 +298,7 @@ export default function App() {
             (value) => setForm((current) => ({ ...current, input_date: value })),
             'date',
           )}
-          {renderTextInput(text.wineName, form.wine_name, (value) =>
-            setForm((current) => ({ ...current, wine_name: value })),
-          )}
+          {renderWineNameInput()}
           {renderNumberInput(text.incoming, form.incoming, (value) =>
             setForm((current) => ({ ...current, incoming: value })),
           )}
