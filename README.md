@@ -1,6 +1,6 @@
 # 와인 재고관리 웹앱
 
-React, Vite, Supabase, CSS로 만든 간단한 와인 재고관리 앱입니다. 화면에는 와인명, 입고, 출고, 현 수량만 표시되며 현 수량은 `입고 - 출고`로 자동 계산됩니다.
+React, Vite, Supabase, CSS로 만든 와인 재고관리 앱입니다. 화면에는 입력날짜, 와인명, 입고, 출고, 현 수량이 표시되며 현 수량은 `입고 - 출고`로 자동 계산됩니다.
 
 ## 1. 설치
 
@@ -15,6 +15,7 @@ Supabase 프로젝트의 SQL Editor에서 아래 SQL을 실행하세요.
 ```sql
 create table if not exists public.wines (
   id uuid primary key default gen_random_uuid(),
+  input_date date not null default current_date,
   wine_name text not null,
   incoming integer not null default 0 check (incoming >= 0),
   outgoing integer not null default 0 check (outgoing >= 0),
@@ -44,6 +45,24 @@ on public.wines
 for delete
 using (true);
 ```
+
+이미 `wines` 테이블을 만들어 둔 경우에는 아래 SQL로 `input_date` 컬럼만 추가하세요.
+
+```sql
+alter table public.wines
+add column if not exists input_date date not null default current_date;
+```
+
+앱에서 사용하는 컬럼은 아래와 같습니다.
+
+```text
+input_date
+wine_name
+incoming
+outgoing
+```
+
+`현 수량`은 데이터베이스에 저장하지 않고 앱에서 `incoming - outgoing`으로 계산합니다.
 
 ## 3. 환경변수 설정
 

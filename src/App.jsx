@@ -1,42 +1,54 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from './supabaseClient';
 
 const text = {
-  appTitle: '\uC640\uC778 \uC7AC\uACE0\uAD00\uB9AC',
-  wineName: '\uC640\uC778\uBA85',
-  incoming: '\uC785\uACE0',
-  outgoing: '\uCD9C\uACE0',
-  stock: '\uD604 \uC218\uB7C9',
-  add: '\uCD94\uAC00',
-  save: '\uC800\uC7A5',
-  cancel: '\uCDE8\uC18C',
-  edit: '\uC218\uC815',
-  delete: '\uC0AD\uC81C',
-  loading: '\uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.',
-  empty: '\uB4F1\uB85D\uB41C \uC640\uC778\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
-  configMissing: 'Supabase \uD658\uACBD\uBCC0\uC218\uB97C \uC124\uC815\uD558\uBA74 \uB370\uC774\uD130\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4.',
-  nameRequired: '\uC640\uC778\uBA85\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.',
-  addSuccess: '\uC640\uC778\uC774 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
-  updateSuccess: '\uC640\uC778\uC774 \uC218\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
-  deleteSuccess: '\uC640\uC778\uC774 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.',
-  countLabel: '\uB4F1\uB85D\uB41C \uC640\uC778 \uC218',
-  tableLabel: '\uC640\uC778 \uC7AC\uACE0 \uBAA9\uB85D',
+  appTitle: '와인 재고관리',
+  inputDate: '입력날짜',
+  wineName: '와인명',
+  incoming: '입고',
+  outgoing: '출고',
+  stock: '현 수량',
+  actions: '관리',
+  add: '추가',
+  save: '저장',
+  cancel: '취소',
+  edit: '수정',
+  delete: '삭제',
+  loading: '불러오는 중입니다.',
+  empty: '등록된 와인이 없습니다.',
+  configMissing: 'Supabase 환경변수를 설정하면 데이터가 표시됩니다.',
+  required: '입력날짜와 와인명을 입력해 주세요.',
+  addSuccess: '와인이 추가되었습니다.',
+  updateSuccess: '와인이 수정되었습니다.',
+  deleteSuccess: '와인이 삭제되었습니다.',
+  tableLabel: '와인 재고 목록',
 };
 
-const emptyForm = {
-  wine_name: '',
-  incoming: '',
-  outgoing: '',
-};
+function getToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function createEmptyForm() {
+  return {
+    input_date: getToday(),
+    wine_name: '',
+    incoming: '0',
+    outgoing: '0',
+  };
+}
 
 function toNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
+function digitsOnly(value) {
+  return value.replace(/\D/g, '');
+}
+
 function normalizeWine(form) {
   return {
+    input_date: form.input_date,
     wine_name: form.wine_name.trim(),
     incoming: toNumber(form.incoming),
     outgoing: toNumber(form.outgoing),
@@ -45,15 +57,20 @@ function normalizeWine(form) {
 
 export default function App() {
   const [wines, setWines] = useState([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(createEmptyForm);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState(createEmptyForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   const sortedWines = useMemo(
-    () => [...wines].sort((a, b) => a.wine_name.localeCompare(b.wine_name, 'ko')),
+    () =>
+      [...wines].sort((a, b) => {
+        const dateCompare = String(b.input_date).localeCompare(String(a.input_date));
+        if (dateCompare !== 0) return dateCompare;
+        return a.wine_name.localeCompare(b.wine_name, 'ko');
+      }),
     [wines],
   );
 
@@ -71,11 +88,12 @@ export default function App() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('wines')
-      .select('id, wine_name, incoming, outgoing')
+      .select('id, input_date, wine_name, incoming, outgoing')
+      .order('input_date', { ascending: false })
       .order('wine_name', { ascending: true });
 
     if (error) {
-      setMessage(`\uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${error.message}`);
+      setMessage(`목록을 불러오지 못했습니다: ${error.message}`);
     } else {
       setWines(data ?? []);
       setMessage('');
@@ -87,8 +105,8 @@ export default function App() {
     event.preventDefault();
     const nextWine = normalizeWine(form);
 
-    if (!nextWine.wine_name) {
-      setMessage(text.nameRequired);
+    if (!nextWine.input_date || !nextWine.wine_name) {
+      setMessage(text.required);
       return;
     }
 
@@ -96,14 +114,14 @@ export default function App() {
     const { data, error } = await supabase
       .from('wines')
       .insert(nextWine)
-      .select('id, wine_name, incoming, outgoing')
+      .select('id, input_date, wine_name, incoming, outgoing')
       .single();
 
     if (error) {
-      setMessage(`\uC640\uC778\uC744 \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${error.message}`);
+      setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
     } else {
       setWines((current) => [...current, data]);
-      setForm(emptyForm);
+      setForm(createEmptyForm());
       setMessage(text.addSuccess);
     }
     setIsSaving(false);
@@ -112,23 +130,24 @@ export default function App() {
   function startEdit(wine) {
     setEditingId(wine.id);
     setEditForm({
+      input_date: wine.input_date || getToday(),
       wine_name: wine.wine_name,
-      incoming: String(wine.incoming),
-      outgoing: String(wine.outgoing),
+      incoming: String(wine.incoming ?? 0),
+      outgoing: String(wine.outgoing ?? 0),
     });
     setMessage('');
   }
 
   function cancelEdit() {
     setEditingId(null);
-    setEditForm(emptyForm);
+    setEditForm(createEmptyForm());
   }
 
   async function updateWine(id) {
     const nextWine = normalizeWine(editForm);
 
-    if (!nextWine.wine_name) {
-      setMessage(text.nameRequired);
+    if (!nextWine.input_date || !nextWine.wine_name) {
+      setMessage(text.required);
       return;
     }
 
@@ -137,11 +156,11 @@ export default function App() {
       .from('wines')
       .update(nextWine)
       .eq('id', id)
-      .select('id, wine_name, incoming, outgoing')
+      .select('id, input_date, wine_name, incoming, outgoing')
       .single();
 
     if (error) {
-      setMessage(`\uC640\uC778\uC744 \uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${error.message}`);
+      setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
     } else {
       setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
       cancelEdit();
@@ -155,7 +174,7 @@ export default function App() {
     const { error } = await supabase.from('wines').delete().eq('id', id);
 
     if (error) {
-      setMessage(`\uC640\uC778\uC744 \uC0AD\uC81C\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: ${error.message}`);
+      setMessage(`와인을 삭제하지 못했습니다: ${error.message}`);
     } else {
       setWines((current) => current.filter((wine) => wine.id !== id));
       setMessage(text.deleteSuccess);
@@ -163,18 +182,46 @@ export default function App() {
     setIsSaving(false);
   }
 
-  function renderValueInput(label, value, onChange, type = 'number') {
+  function renderTextInput(label, value, onChange, type = 'text') {
     return (
       <label>
         <span>{label}</span>
         <input
-          min={type === 'number' ? '0' : undefined}
           type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          required={label === text.wineName}
+          required
         />
       </label>
+    );
+  }
+
+  function renderNumberInput(label, value, onChange) {
+    return (
+      <label>
+        <span>{label}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          onChange={(event) => onChange(digitsOnly(event.target.value))}
+          required
+        />
+      </label>
+    );
+  }
+
+  function renderEditNumberInput(label, value, onChange) {
+    return (
+      <input
+        aria-label={label}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={(event) => onChange(digitsOnly(event.target.value))}
+      />
     );
   }
 
@@ -183,27 +230,30 @@ export default function App() {
       <section className="inventory-shell" aria-label={text.appTitle}>
         <div className="title-row">
           <h1>{text.appTitle}</h1>
-          <div className="total-count" aria-label={text.countLabel}>
-            {wines.length}
-          </div>
         </div>
 
         <form className="wine-form" onSubmit={addWine}>
-          {renderValueInput(
-            text.wineName,
-            form.wine_name,
-            (value) => setForm((current) => ({ ...current, wine_name: value })),
-            'text',
+          {renderTextInput(
+            text.inputDate,
+            form.input_date,
+            (value) => setForm((current) => ({ ...current, input_date: value })),
+            'date',
           )}
-          {renderValueInput(text.incoming, form.incoming, (value) =>
+          {renderTextInput(text.wineName, form.wine_name, (value) =>
+            setForm((current) => ({ ...current, wine_name: value })),
+          )}
+          {renderNumberInput(text.incoming, form.incoming, (value) =>
             setForm((current) => ({ ...current, incoming: value })),
           )}
-          {renderValueInput(text.outgoing, form.outgoing, (value) =>
+          {renderNumberInput(text.outgoing, form.outgoing, (value) =>
             setForm((current) => ({ ...current, outgoing: value })),
           )}
+          <div className="calculated-field">
+            <span>{text.stock}</span>
+            <strong>{toNumber(form.incoming) - toNumber(form.outgoing)}</strong>
+          </div>
           <button className="primary-button" type="submit" disabled={isSaving || !hasSupabaseConfig}>
-            <Plus size={18} aria-hidden="true" />
-            <span>{text.add}</span>
+            {text.add}
           </button>
         </form>
 
@@ -211,11 +261,12 @@ export default function App() {
 
         <div className="inventory-table" role="table" aria-label={text.tableLabel}>
           <div className="table-header" role="row">
+            <span role="columnheader">{text.inputDate}</span>
             <span role="columnheader">{text.wineName}</span>
             <span role="columnheader">{text.incoming}</span>
             <span role="columnheader">{text.outgoing}</span>
             <span role="columnheader">{text.stock}</span>
-            <span className="action-space" aria-hidden="true" />
+            <span role="columnheader">{text.actions}</span>
           </div>
 
           {isLoading ? (
@@ -224,87 +275,90 @@ export default function App() {
             <div className="empty-state">{text.empty}</div>
           ) : (
             sortedWines.map((wine) => {
-              const currentStock = wine.incoming - wine.outgoing;
+              const currentStock = toNumber(wine.incoming) - toNumber(wine.outgoing);
               const isEditing = editingId === wine.id;
 
               return (
                 <div className="table-row" role="row" key={wine.id}>
                   {isEditing ? (
                     <>
-                      <input
-                        aria-label={text.wineName}
-                        type="text"
-                        value={editForm.wine_name}
-                        onChange={(event) =>
-                          setEditForm((current) => ({ ...current, wine_name: event.target.value }))
-                        }
-                      />
-                      <input
-                        aria-label={text.incoming}
-                        min="0"
-                        type="number"
-                        value={editForm.incoming}
-                        onChange={(event) =>
-                          setEditForm((current) => ({ ...current, incoming: event.target.value }))
-                        }
-                      />
-                      <input
-                        aria-label={text.outgoing}
-                        min="0"
-                        type="number"
-                        value={editForm.outgoing}
-                        onChange={(event) =>
-                          setEditForm((current) => ({ ...current, outgoing: event.target.value }))
-                        }
-                      />
-                      <strong>{toNumber(editForm.incoming) - toNumber(editForm.outgoing)}</strong>
+                      <div className="cell" data-label={text.inputDate}>
+                        <input
+                          aria-label={text.inputDate}
+                          type="date"
+                          value={editForm.input_date}
+                          onChange={(event) =>
+                            setEditForm((current) => ({ ...current, input_date: event.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="cell" data-label={text.wineName}>
+                        <input
+                          aria-label={text.wineName}
+                          type="text"
+                          value={editForm.wine_name}
+                          onChange={(event) =>
+                            setEditForm((current) => ({ ...current, wine_name: event.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="cell" data-label={text.incoming}>
+                        {renderEditNumberInput(text.incoming, editForm.incoming, (value) =>
+                          setEditForm((current) => ({ ...current, incoming: value })),
+                        )}
+                      </div>
+                      <div className="cell" data-label={text.outgoing}>
+                        {renderEditNumberInput(text.outgoing, editForm.outgoing, (value) =>
+                          setEditForm((current) => ({ ...current, outgoing: value })),
+                        )}
+                      </div>
+                      <strong className="cell stock-cell" data-label={text.stock}>
+                        {toNumber(editForm.incoming) - toNumber(editForm.outgoing)}
+                      </strong>
                       <div className="row-actions">
-                        <button
-                          className="icon-button"
-                          type="button"
-                          title={text.save}
-                          onClick={() => updateWine(wine.id)}
-                          disabled={isSaving}
-                        >
-                          <Check size={18} aria-hidden="true" />
+                        <button type="button" onClick={() => updateWine(wine.id)} disabled={isSaving}>
+                          {text.save}
                         </button>
-                        <button
-                          className="icon-button"
-                          type="button"
-                          title={text.cancel}
-                          onClick={cancelEdit}
-                          disabled={isSaving}
-                        >
-                          <X size={18} aria-hidden="true" />
+                        <button type="button" onClick={cancelEdit} disabled={isSaving}>
+                          {text.cancel}
                         </button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <span className="wine-name">{wine.wine_name}</span>
-                      <span>{wine.incoming}</span>
-                      <span>{wine.outgoing}</span>
-                      <strong className={currentStock < 0 ? 'stock-negative' : ''}>
+                      <span className="cell" data-label={text.inputDate}>
+                        {wine.input_date}
+                      </span>
+                      <span className="cell wine-name" data-label={text.wineName}>
+                        {wine.wine_name}
+                      </span>
+                      <span className="cell number-cell" data-label={text.incoming}>
+                        {wine.incoming}
+                      </span>
+                      <span className="cell number-cell" data-label={text.outgoing}>
+                        {wine.outgoing}
+                      </span>
+                      <strong
+                        className={`cell stock-cell ${currentStock < 0 ? 'stock-negative' : ''}`}
+                        data-label={text.stock}
+                      >
                         {currentStock}
                       </strong>
                       <div className="row-actions">
                         <button
-                          className="icon-button"
                           type="button"
-                          title={text.edit}
                           onClick={() => startEdit(wine)}
                           disabled={isSaving || !hasSupabaseConfig}
                         >
-                          <Pencil size={18} aria-hidden="true" />
+                          {text.edit}
                         </button>
                         <button
-                          className="icon-button danger"
+                          className="danger"
                           type="button"
-                          title={text.delete}
                           onClick={() => deleteWine(wine.id)}
                           disabled={isSaving || !hasSupabaseConfig}
                         >
-                          <Trash2 size={18} aria-hidden="true" />
+                          {text.delete}
                         </button>
                       </div>
                     </>
