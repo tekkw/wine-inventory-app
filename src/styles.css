@@ -1,0 +1,301 @@
+:root {
+  color: #1f2933;
+  background: #f6f4ef;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 32px;
+  background:
+    linear-gradient(135deg, rgba(102, 44, 62, 0.08), transparent 38%),
+    linear-gradient(315deg, rgba(47, 93, 98, 0.1), transparent 34%),
+    #f6f4ef;
+}
+
+.inventory-shell {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1 {
+  margin: 0;
+  color: #2d1f22;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: 0;
+}
+
+.total-count {
+  display: grid;
+  min-width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid #ded6ca;
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #713246;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.wine-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(2, minmax(120px, 0.7fr)) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #ded6ca;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #5b6168;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #c9c1b8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+  padding: 10px 12px;
+  outline: none;
+}
+
+input:focus {
+  border-color: #7f354e;
+  box-shadow: 0 0 0 3px rgba(127, 53, 78, 0.14);
+}
+
+.primary-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.primary-button {
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 6px;
+  background: #713246;
+  color: #ffffff;
+  padding: 0 18px;
+  font-weight: 800;
+}
+
+.primary-button:hover,
+.icon-button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.message {
+  margin: 0 0 16px;
+  color: #713246;
+  font-weight: 700;
+}
+
+.inventory-table {
+  overflow: hidden;
+  border: 1px solid #ded6ca;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.table-header,
+.table-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.8fr) minmax(82px, 0.7fr) minmax(82px, 0.7fr) minmax(92px, 0.7fr) 96px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.table-header {
+  background: #ede7de;
+  color: #5b6168;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.table-row {
+  min-height: 68px;
+  border-top: 1px solid #ebe4da;
+}
+
+.table-row span,
+.table-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wine-name {
+  color: #172026;
+  font-weight: 800;
+}
+
+.stock-negative {
+  color: #b42318;
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  background: #f0ebe3;
+  color: #27323a;
+}
+
+.icon-button.danger {
+  color: #a12a2a;
+}
+
+.empty-state {
+  padding: 32px 16px;
+  color: #68717a;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .app {
+    padding: 20px 14px;
+  }
+
+  .wine-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .wine-form label:first-child,
+  .primary-button {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-table {
+    display: grid;
+    gap: 10px;
+    border: 0;
+    background: transparent;
+  }
+
+  .table-header {
+    display: none;
+  }
+
+  .table-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    border: 1px solid #ded6ca;
+    border-radius: 8px;
+    background: #fffdf8;
+    padding: 14px;
+  }
+
+  .table-row > span,
+  .table-row > strong,
+  .table-row > input {
+    display: grid;
+    gap: 4px;
+  }
+
+  .table-row > span::before,
+  .table-row > strong::before {
+    color: #6a7179;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .table-row > span:nth-child(1)::before {
+    content: "\C640\C778\BA85";
+  }
+
+  .table-row > span:nth-child(2)::before {
+    content: "\C785\ACE0";
+  }
+
+  .table-row > span:nth-child(3)::before {
+    content: "\CD9C\ACE0";
+  }
+
+  .table-row > strong:nth-child(4)::before {
+    content: "\D604 \C218\B7C9";
+  }
+
+  .wine-name,
+  .row-actions {
+    grid-column: 1 / -1;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 440px) {
+  .title-row {
+    align-items: flex-start;
+  }
+
+  .wine-form,
+  .table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .row-actions {
+    justify-content: stretch;
+  }
+
+  .icon-button {
+    flex: 1;
+  }
+}
