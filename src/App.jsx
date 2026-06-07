@@ -23,9 +23,10 @@ const text = {
   required: '입력날짜와 와인명을 입력해 주세요.',
   addSuccess: '와인이 추가되었습니다.',
   updateSuccess: '와인이 수정되었습니다.',
-  deleteSuccess: '와인이 삭제되었습니다.',
+  deleteSuccess: '휴지통으로 이동했습니다.',
   importSuccess: '엑셀 데이터를 불러왔습니다.',
   importFailed: '엑셀 파일을 읽지 못했습니다. Excel에서 CSV 형식으로 저장한 파일을 선택해 주세요.',
+  confirmDelete: '정말 삭제하시겠습니까?',
   tableLabel: '와인 재고 목록',
 };
 
@@ -168,7 +169,8 @@ export default function App() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('wines')
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
+      .eq('is_deleted', false)
       .order('input_date', { ascending: false })
       .order('wine_name', { ascending: true });
 
@@ -193,8 +195,8 @@ export default function App() {
     setIsSaving(true);
     const { data, error } = await supabase
       .from('wines')
-      .insert(nextWine)
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
+      .insert({ ...nextWine, is_deleted: false, deleted_at: null })
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
       .single();
 
     if (error) {
@@ -240,7 +242,7 @@ export default function App() {
       .from('wines')
       .update(nextWine)
       .eq('id', id)
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
       .single();
 
     if (error) {
@@ -254,8 +256,13 @@ export default function App() {
   }
 
   async function deleteWine(id) {
+    if (!window.confirm(text.confirmDelete)) return;
+
     setIsSaving(true);
-    const { error } = await supabase.from('wines').delete().eq('id', id);
+    const { error } = await supabase
+      .from('wines')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', id);
 
     if (error) {
       setMessage(`와인을 삭제하지 못했습니다: ${error.message}`);
