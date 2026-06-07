@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { hasSupabaseConfig, supabase } from './supabaseClient';
 
-const imageBucket = 'wine-images';
-
 const text = {
   appTitle: '와인 재고관리',
-  image: '이미지',
   inputDate: '입력날짜',
   wineName: '와인명',
   previousStock: '전월재고',
@@ -20,7 +17,6 @@ const text = {
   delete: '삭제',
   loading: '불러오는 중입니다.',
   empty: '등록된 와인이 없습니다.',
-  noImage: '이미지 없음',
   importExcel: '엑셀 불러오기',
   exportExcel: '엑셀 내보내기',
   configMissing: 'Supabase 환경변수를 설정하면 데이터가 표시됩니다.',
@@ -68,11 +64,6 @@ function normalizeWine(form) {
     incoming: toNumber(form.incoming),
     outgoing: toNumber(form.outgoing),
   };
-}
-
-function getFileExtension(fileName) {
-  const extension = fileName.split('.').pop();
-  return extension ? extension.toLowerCase() : 'jpg';
 }
 
 function parseCsvLine(line) {
@@ -129,10 +120,8 @@ function downloadFile(fileName, content, type) {
 export default function App() {
   const [wines, setWines] = useState([]);
   const [form, setForm] = useState(createEmptyForm);
-  const [imageFile, setImageFile] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(createEmptyForm);
-  const [editImageFile, setEditImageFile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -179,7 +168,7 @@ export default function App() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('wines')
-      .select('id, image_url, input_date, wine_name, previous_stock, incoming, outgoing')
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
       .order('input_date', { ascending: false })
       .order('wine_name', { ascending: true });
 
@@ -192,24 +181,6 @@ export default function App() {
     setIsLoading(false);
   }
 
-  async function uploadImage(file) {
-    if (!file) return null;
-
-    const extension = getFileExtension(file.name);
-    const filePath = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from(imageBucket).upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    });
-
-    if (error) {
-      throw new Error(`이미지를 업로드하지 못했습니다: ${error.message}`);
-    }
-
-    const { data } = supabase.storage.from(imageBucket).getPublicUrl(filePath);
-    return data.publicUrl;
-  }
-
   async function addWine(event) {
     event.preventDefault();
     const nextWine = normalizeWine(form);
@@ -220,26 +191,20 @@ export default function App() {
     }
 
     setIsSaving(true);
-    try {
-      const imageUrl = await uploadImage(imageFile);
-      const { data, error } = await supabase
-        .from('wines')
-        .insert({ ...nextWine, image_url: imageUrl })
-        .select('id, image_url, input_date, wine_name, previous_stock, incoming, outgoing')
-        .single();
+    const { data, error } = await supabase
+      .from('wines')
+      .insert(nextWine)
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
+      .single();
 
-      if (error) {
-        setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
-      } else {
-        setWines((current) => [...current, data]);
-        setForm(createEmptyForm());
-        setImageFile(null);
-        setShowSuggestions(false);
-        event.currentTarget.reset();
-        setMessage(text.addSuccess);
-      }
-    } catch (error) {
-      setMessage(error.message);
+    if (error) {
+      setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
+    } else {
+      setWines((current) => [...current, data]);
+      setForm(createEmptyForm());
+      setShowSuggestions(false);
+      event.currentTarget.reset();
+      setMessage(text.addSuccess);
     }
     setIsSaving(false);
   }
@@ -252,9 +217,7 @@ export default function App() {
       previous_stock: String(wine.previous_stock ?? 0),
       incoming: String(wine.incoming ?? 0),
       outgoing: String(wine.outgoing ?? 0),
-      image_url: wine.image_url || null,
     });
-    setEditImageFile(null);
     setMessage('');
     setShowSuggestions(false);
   }
@@ -262,7 +225,6 @@ export default function App() {
   function cancelEdit() {
     setEditingId(null);
     setEditForm(createEmptyForm());
-    setEditImageFile(null);
   }
 
   async function updateWine(id) {
@@ -274,25 +236,19 @@ export default function App() {
     }
 
     setIsSaving(true);
-    try {
-      const newImageUrl = await uploadImage(editImageFile);
-      const imageUrl = newImageUrl || editForm.image_url || null;
-      const { data, error } = await supabase
-        .from('wines')
-        .update({ ...nextWine, image_url: imageUrl })
-        .eq('id', id)
-        .select('id, image_url, input_date, wine_name, previous_stock, incoming, outgoing')
-        .single();
+    const { data, error } = await supabase
+      .from('wines')
+      .update(nextWine)
+      .eq('id', id)
+      .select('id, input_date, wine_name, previous_stock, incoming, outgoing')
+      .single();
 
-      if (error) {
-        setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
-      } else {
-        setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
-        cancelEdit();
-        setMessage(text.updateSuccess);
-      }
-    } catch (error) {
-      setMessage(error.message);
+    if (error) {
+      setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
+    } else {
+      setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
+      cancelEdit();
+      setMessage(text.updateSuccess);
     }
     setIsSaving(false);
   }
@@ -379,19 +335,6 @@ export default function App() {
     );
   }
 
-  function renderImageInput() {
-    return (
-      <label className="file-field">
-        <span>{text.image}</span>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(event) => setImageFile(event.target.files?.[0] || null)}
-        />
-      </label>
-    );
-  }
-
   function renderEditNumberInput(label, value, onChange) {
     return (
       <input
@@ -403,14 +346,6 @@ export default function App() {
         onChange={(event) => onChange(digitsOnly(event.target.value))}
       />
     );
-  }
-
-  function renderThumbnail(wine) {
-    if (!wine.image_url) {
-      return <span className="no-image">{text.noImage}</span>;
-    }
-
-    return <img className="thumbnail" src={wine.image_url} alt={`${wine.wine_name} 이미지`} />;
   }
 
   async function importExcelFile(file) {
@@ -473,7 +408,6 @@ export default function App() {
 
   function exportExcel() {
     const header = [
-      text.image,
       text.inputDate,
       text.wineName,
       text.previousStock,
@@ -482,7 +416,6 @@ export default function App() {
       text.stock,
     ];
     const rows = sortedWines.map((wine) => [
-      wine.image_url || '',
       wine.input_date,
       wine.wine_name,
       wine.previous_stock ?? 0,
@@ -516,7 +449,6 @@ export default function App() {
         </div>
 
         <form className="wine-form" onSubmit={addWine}>
-          {renderImageInput()}
           {renderTextInput(
             text.inputDate,
             form.input_date,
@@ -546,7 +478,6 @@ export default function App() {
 
         <div className="inventory-table" role="table" aria-label={text.tableLabel}>
           <div className="table-header" role="row">
-            <span role="columnheader">{text.image}</span>
             <span role="columnheader">{text.inputDate}</span>
             <span role="columnheader">{text.wineName}</span>
             <span role="columnheader">{text.previousStock}</span>
@@ -569,23 +500,6 @@ export default function App() {
                 <div className="table-row" role="row" key={wine.id}>
                   {isEditing ? (
                     <>
-                      <div className="cell image-cell" data-label={text.image}>
-                        {editForm.image_url ? (
-                          <img
-                            className="thumbnail"
-                            src={editForm.image_url}
-                            alt={`${editForm.wine_name} 이미지`}
-                          />
-                        ) : (
-                          <span className="no-image">{text.noImage}</span>
-                        )}
-                        <input
-                          aria-label={text.image}
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => setEditImageFile(event.target.files?.[0] || null)}
-                        />
-                      </div>
                       <div className="cell" data-label={text.inputDate}>
                         <input
                           aria-label={text.inputDate}
@@ -635,9 +549,6 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <span className="cell image-cell" data-label={text.image}>
-                        {renderThumbnail(wine)}
-                      </span>
                       <span className="cell" data-label={text.inputDate}>
                         {wine.input_date}
                       </span>

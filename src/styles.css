@@ -47,7 +47,7 @@ h1 {
 
 .wine-form {
   display: grid;
-  grid-template-columns: 160px 140px minmax(220px, 1fr) 110px 100px 100px 100px 90px;
+  grid-template-columns: 140px minmax(220px, 1fr) 110px 100px 100px 100px 90px;
   gap: 0;
   align-items: stretch;
   margin-bottom: 12px;
@@ -83,11 +83,6 @@ input {
   color: #111827;
   padding: 8px 10px;
   outline: none;
-}
-
-input[type="file"] {
-  font-size: 12px;
-  padding: 9px 8px;
 }
 
 input:focus {
@@ -221,8 +216,8 @@ button:disabled {
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 90px 140px minmax(240px, 1fr) 110px 100px 100px 100px 150px;
-  min-width: 1030px;
+  grid-template-columns: 140px minmax(240px, 1fr) 110px 100px 100px 100px 150px;
+  min-width: 940px;
 }
 
 .table-header {
@@ -265,32 +260,6 @@ button:disabled {
   min-height: 24px;
   padding: 4px 6px;
   border: 1px solid #9ca3af;
-}
-
-.image-cell {
-  justify-content: center;
-  gap: 8px;
-}
-
-.image-cell input[type="file"] {
-  width: 100%;
-  min-height: 28px;
-  padding: 4px;
-}
-
-.thumbnail {
-  width: 48px;
-  height: 48px;
-  border: 1px solid #cbd5e1;
-  background: #f9fafb;
-  object-fit: cover;
-}
-
-.no-image {
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.25;
-  text-align: center;
 }
 
 .wine-name {
@@ -338,7 +307,7 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 
-  .wine-form label:nth-child(3),
+  .wine-form label:nth-child(2),
   .primary-button {
     grid-column: 1 / -1;
   }
@@ -398,10 +367,6 @@ button:disabled {
   .stock-cell {
     justify-content: stretch;
     text-align: left;
-  }
-
-  .image-cell {
-    justify-content: stretch;
   }
 
   .wine-name,
