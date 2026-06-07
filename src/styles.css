@@ -45,9 +45,30 @@ h1 {
   letter-spacing: 0;
 }
 
+.tab-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #1f2937;
+}
+
+.tab-button {
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-bottom: 0;
+  background: #f9fafb;
+  color: #374151;
+  padding: 0 18px;
+}
+
+.tab-button.active {
+  background: #1f2937;
+  color: #ffffff;
+}
+
 .wine-form {
   display: grid;
-  grid-template-columns: 150px minmax(220px, 1fr) 110px 110px 110px 90px;
+  grid-template-columns: 170px 150px minmax(220px, 1fr) 110px 110px 110px 90px;
   gap: 0;
   align-items: stretch;
   margin-bottom: 12px;
@@ -83,6 +104,11 @@ input {
   color: #111827;
   padding: 8px 10px;
   outline: none;
+}
+
+input[type="file"] {
+  font-size: 12px;
+  padding: 9px 8px;
 }
 
 input:focus {
@@ -174,6 +200,39 @@ button:disabled {
   font-weight: 600;
 }
 
+.excel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.toolbar-file {
+  display: flex;
+  grid-template-rows: none;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+}
+
+.toolbar-file span {
+  min-height: 34px;
+  border: 1px solid #9ca3af;
+  background: #ffffff;
+  padding: 8px 12px;
+  color: #111827;
+}
+
+.toolbar-file input {
+  width: 230px;
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+}
+
 .inventory-table {
   overflow-x: auto;
   border: 1px solid #cbd5e1;
@@ -183,8 +242,34 @@ button:disabled {
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 150px minmax(240px, 1fr) 110px 110px 110px 150px;
-  min-width: 820px;
+  grid-template-columns: 90px 150px minmax(240px, 1fr) 110px 110px 110px 150px;
+  min-width: 930px;
+}
+
+.previous-header,
+.previous-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 150px 120px 120px 120px;
+  min-width: 770px;
+}
+
+.previous-header {
+  background: #dbe3ee;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.previous-header span {
+  min-width: 0;
+  min-height: 42px;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 9px 10px;
+}
+
+.previous-row:nth-child(odd) {
+  background: #f9fafb;
 }
 
 .table-header {
@@ -227,6 +312,32 @@ button:disabled {
   min-height: 24px;
   padding: 4px 6px;
   border: 1px solid #9ca3af;
+}
+
+.image-cell {
+  justify-content: center;
+  gap: 8px;
+}
+
+.image-cell input[type="file"] {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px;
+}
+
+.thumbnail {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #cbd5e1;
+  background: #f9fafb;
+  object-fit: cover;
+}
+
+.no-image {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .wine-name {
@@ -274,7 +385,7 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 
-  .wine-form label:nth-child(2),
+  .wine-form label:nth-child(3),
   .primary-button {
     grid-column: 1 / -1;
   }
@@ -304,7 +415,12 @@ button:disabled {
     display: none;
   }
 
-  .table-row {
+  .previous-header {
+    display: none;
+  }
+
+  .table-row,
+  .previous-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     min-width: 0;
@@ -336,6 +452,10 @@ button:disabled {
     text-align: left;
   }
 
+  .image-cell {
+    justify-content: stretch;
+  }
+
   .wine-name,
   .row-actions {
     grid-column: 1 / -1;
@@ -343,6 +463,20 @@ button:disabled {
 
   .row-actions {
     justify-content: flex-start;
+  }
+
+  .excel-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-file {
+    display: grid;
+    gap: 6px;
+  }
+
+  .toolbar-file input {
+    width: 100%;
   }
 }
 
@@ -356,7 +490,8 @@ button:disabled {
   }
 
   .wine-form,
-  .table-row {
+  .table-row,
+  .previous-row {
     grid-template-columns: 1fr;
   }
 

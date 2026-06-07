@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { hasSupabaseConfig, supabase } from './supabaseClient';
 
+const imageBucket = 'wine-images';
+
 const text = {
   appTitle: '와인 재고관리',
+  inventoryTab: '재고관리',
+  previousStockTab: '전월 재고 수량',
+  image: '이미지',
   inputDate: '입력날짜',
   wineName: '와인명',
   incoming: '입고',
@@ -16,13 +21,22 @@ const text = {
   delete: '삭제',
   loading: '불러오는 중입니다.',
   empty: '등록된 와인이 없습니다.',
+  noImage: '이미지 없음',
   configMissing: 'Supabase 환경변수를 설정하면 데이터가 표시됩니다.',
   required: '입력날짜와 와인명을 입력해 주세요.',
   addSuccess: '와인이 추가되었습니다.',
   updateSuccess: '와인이 수정되었습니다.',
   deleteSuccess: '와인이 삭제되었습니다.',
   tableLabel: '와인 재고 목록',
+  previousStock: '전월 재고 수량',
+  importCsv: 'CSV 가져오기',
+  exportCsv: 'CSV 내보내기',
+  exportExcel: '엑셀 내보내기',
+  csvImported: '전월 재고 수량을 가져왔습니다.',
+  csvImportFailed: 'CSV 파일을 읽지 못했습니다.',
 };
+
+const previousStockStorageKey = 'wine-inventory-previous-stock';
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -55,15 +69,81 @@ function normalizeWine(form) {
   };
 }
 
+function getFileExtension(fileName) {
+  const extension = fileName.split('.').pop();
+  return extension ? extension.toLowerCase() : 'jpg';
+}
+
+function parseCsvLine(line) {
+  const cells = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"' && nextChar === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function parseCsv(csvText) {
+  return csvText
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .map(parseCsvLine);
+}
+
+function escapeCsv(value) {
+  const stringValue = String(value ?? '');
+  return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function downloadFile(fileName, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [wines, setWines] = useState([]);
+  const [activeTab, setActiveTab] = useState('inventory');
   const [form, setForm] = useState(createEmptyForm);
+  const [imageFile, setImageFile] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(createEmptyForm);
+  const [editImageFile, setEditImageFile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [previousStockMap, setPreviousStockMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(previousStockStorageKey)) || {};
+    } catch {
+      return {};
+    }
+  });
 
   const sortedWines = useMemo(
     () =>
@@ -92,9 +172,49 @@ export default function App() {
   const shouldShowSuggestions =
     showSuggestions && form.wine_name.trim() && wineNameSuggestions.length > 0;
 
+  const previousStockRows = useMemo(() => {
+    const rowMap = new Map();
+
+    wines.forEach((wine) => {
+      const name = wine.wine_name?.trim();
+      if (!name) return;
+
+      const currentRow = rowMap.get(name) || {
+        wine_name: name,
+        previous_stock: toNumber(previousStockMap[name]),
+        incoming: 0,
+        outgoing: 0,
+        stock: 0,
+      };
+
+      currentRow.incoming += toNumber(wine.incoming);
+      currentRow.outgoing += toNumber(wine.outgoing);
+      currentRow.stock += toNumber(wine.incoming) - toNumber(wine.outgoing);
+      rowMap.set(name, currentRow);
+    });
+
+    Object.entries(previousStockMap).forEach(([name, previousStock]) => {
+      if (!rowMap.has(name)) {
+        rowMap.set(name, {
+          wine_name: name,
+          previous_stock: toNumber(previousStock),
+          incoming: 0,
+          outgoing: 0,
+          stock: toNumber(previousStock),
+        });
+      }
+    });
+
+    return Array.from(rowMap.values()).sort((a, b) => a.wine_name.localeCompare(b.wine_name, 'ko'));
+  }, [previousStockMap, wines]);
+
   useEffect(() => {
     loadWines();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(previousStockStorageKey, JSON.stringify(previousStockMap));
+  }, [previousStockMap]);
 
   async function loadWines() {
     if (!hasSupabaseConfig) {
@@ -106,7 +226,7 @@ export default function App() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('wines')
-      .select('id, input_date, wine_name, incoming, outgoing')
+      .select('id, image_url, input_date, wine_name, incoming, outgoing')
       .order('input_date', { ascending: false })
       .order('wine_name', { ascending: true });
 
@@ -119,6 +239,24 @@ export default function App() {
     setIsLoading(false);
   }
 
+  async function uploadImage(file) {
+    if (!file) return null;
+
+    const extension = getFileExtension(file.name);
+    const filePath = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from(imageBucket).upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+    if (error) {
+      throw new Error(`이미지를 업로드하지 못했습니다: ${error.message}`);
+    }
+
+    const { data } = supabase.storage.from(imageBucket).getPublicUrl(filePath);
+    return data.publicUrl;
+  }
+
   async function addWine(event) {
     event.preventDefault();
     const nextWine = normalizeWine(form);
@@ -129,19 +267,26 @@ export default function App() {
     }
 
     setIsSaving(true);
-    const { data, error } = await supabase
-      .from('wines')
-      .insert(nextWine)
-      .select('id, input_date, wine_name, incoming, outgoing')
-      .single();
+    try {
+      const imageUrl = await uploadImage(imageFile);
+      const { data, error } = await supabase
+        .from('wines')
+        .insert({ ...nextWine, image_url: imageUrl })
+        .select('id, image_url, input_date, wine_name, incoming, outgoing')
+        .single();
 
-    if (error) {
-      setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
-    } else {
-      setWines((current) => [...current, data]);
-      setForm(createEmptyForm());
-      setShowSuggestions(false);
-      setMessage(text.addSuccess);
+      if (error) {
+        setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
+      } else {
+        setWines((current) => [...current, data]);
+        setForm(createEmptyForm());
+        setImageFile(null);
+        setShowSuggestions(false);
+        event.currentTarget.reset();
+        setMessage(text.addSuccess);
+      }
+    } catch (error) {
+      setMessage(error.message);
     }
     setIsSaving(false);
   }
@@ -153,7 +298,9 @@ export default function App() {
       wine_name: wine.wine_name,
       incoming: String(wine.incoming ?? 0),
       outgoing: String(wine.outgoing ?? 0),
+      image_url: wine.image_url || null,
     });
+    setEditImageFile(null);
     setMessage('');
     setShowSuggestions(false);
   }
@@ -161,6 +308,7 @@ export default function App() {
   function cancelEdit() {
     setEditingId(null);
     setEditForm(createEmptyForm());
+    setEditImageFile(null);
   }
 
   async function updateWine(id) {
@@ -172,19 +320,25 @@ export default function App() {
     }
 
     setIsSaving(true);
-    const { data, error } = await supabase
-      .from('wines')
-      .update(nextWine)
-      .eq('id', id)
-      .select('id, input_date, wine_name, incoming, outgoing')
-      .single();
+    try {
+      const newImageUrl = await uploadImage(editImageFile);
+      const imageUrl = newImageUrl || editForm.image_url || null;
+      const { data, error } = await supabase
+        .from('wines')
+        .update({ ...nextWine, image_url: imageUrl })
+        .eq('id', id)
+        .select('id, image_url, input_date, wine_name, incoming, outgoing')
+        .single();
 
-    if (error) {
-      setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
-    } else {
-      setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
-      cancelEdit();
-      setMessage(text.updateSuccess);
+      if (error) {
+        setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
+      } else {
+        setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
+        cancelEdit();
+        setMessage(text.updateSuccess);
+      }
+    } catch (error) {
+      setMessage(error.message);
     }
     setIsSaving(false);
   }
@@ -271,6 +425,19 @@ export default function App() {
     );
   }
 
+  function renderImageInput() {
+    return (
+      <label className="file-field">
+        <span>{text.image}</span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+        />
+      </label>
+    );
+  }
+
   function renderEditNumberInput(label, value, onChange) {
     return (
       <input
@@ -284,6 +451,126 @@ export default function App() {
     );
   }
 
+  function renderThumbnail(wine) {
+    if (!wine.image_url) {
+      return <span className="no-image">{text.noImage}</span>;
+    }
+
+    return <img className="thumbnail" src={wine.image_url} alt={`${wine.wine_name} 이미지`} />;
+  }
+
+  function importPreviousStockCsv(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = parseCsv(String(reader.result || ''));
+        if (rows.length === 0) return;
+
+        const header = rows[0].map((cell) => cell.replace(/\s/g, '').toLowerCase());
+        const hasHeader =
+          header.includes('와인명') ||
+          header.includes('품명') ||
+          header.includes('wine_name') ||
+          header.includes('전월재고수량');
+
+        const dataRows = hasHeader ? rows.slice(1) : rows;
+        const nameIndex = hasHeader
+          ? header.findIndex((cell) => ['와인명', '품명', 'wine_name', 'winename'].includes(cell))
+          : 0;
+        const stockIndex = hasHeader
+          ? header.findIndex((cell) =>
+              ['전월재고수량', '전월재고', 'previous_stock', 'previousstock'].includes(cell),
+            )
+          : 1;
+
+        if (nameIndex < 0 || stockIndex < 0) {
+          setMessage('CSV에 와인명과 전월 재고 수량 컬럼이 필요합니다.');
+          return;
+        }
+
+        const nextMap = {};
+        dataRows.forEach((row) => {
+          const name = row[nameIndex]?.trim();
+          if (!name) return;
+          nextMap[name] = toNumber(row[stockIndex]);
+        });
+
+        setPreviousStockMap(nextMap);
+        setMessage(text.csvImported);
+      } catch {
+        setMessage(text.csvImportFailed);
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function exportInventoryCsv() {
+    const header = [
+      text.inputDate,
+      text.wineName,
+      text.previousStock,
+      text.incoming,
+      text.outgoing,
+      text.stock,
+      '이미지 URL',
+    ];
+    const rows = sortedWines.map((wine) => [
+      wine.input_date,
+      wine.wine_name,
+      previousStockMap[wine.wine_name] ?? 0,
+      wine.incoming,
+      wine.outgoing,
+      toNumber(wine.incoming) - toNumber(wine.outgoing),
+      wine.image_url || '',
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    downloadFile(`wine-inventory-${getToday()}.csv`, `\uFEFF${csv}`, 'text/csv;charset=utf-8;');
+  }
+
+  function exportInventoryExcel() {
+    const rows = sortedWines
+      .map(
+        (wine) => `
+          <tr>
+            <td>${wine.input_date}</td>
+            <td>${wine.wine_name}</td>
+            <td>${previousStockMap[wine.wine_name] ?? 0}</td>
+            <td>${wine.incoming}</td>
+            <td>${wine.outgoing}</td>
+            <td>${toNumber(wine.incoming) - toNumber(wine.outgoing)}</td>
+            <td>${wine.image_url || ''}</td>
+          </tr>`,
+      )
+      .join('');
+    const html = `
+      <html>
+        <head><meta charset="UTF-8" /></head>
+        <body>
+          <table border="1">
+            <thead>
+              <tr>
+                <th>${text.inputDate}</th>
+                <th>${text.wineName}</th>
+                <th>${text.previousStock}</th>
+                <th>${text.incoming}</th>
+                <th>${text.outgoing}</th>
+                <th>${text.stock}</th>
+                <th>이미지 URL</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+      </html>`;
+    downloadFile(
+      `wine-inventory-${getToday()}.xls`,
+      html,
+      'application/vnd.ms-excel;charset=utf-8;',
+    );
+  }
+
   return (
     <main className="app">
       <section className="inventory-shell" aria-label={text.appTitle}>
@@ -291,7 +578,26 @@ export default function App() {
           <h1>{text.appTitle}</h1>
         </div>
 
-        <form className="wine-form" onSubmit={addWine}>
+        <div className="tab-row" role="tablist" aria-label="재고 화면 선택">
+          <button
+            className={activeTab === 'inventory' ? 'tab-button active' : 'tab-button'}
+            type="button"
+            onClick={() => setActiveTab('inventory')}
+          >
+            {text.inventoryTab}
+          </button>
+          <button
+            className={activeTab === 'previous' ? 'tab-button active' : 'tab-button'}
+            type="button"
+            onClick={() => setActiveTab('previous')}
+          >
+            {text.previousStockTab}
+          </button>
+        </div>
+
+        {activeTab === 'inventory' && (
+          <form className="wine-form" onSubmit={addWine}>
+          {renderImageInput()}
           {renderTextInput(
             text.inputDate,
             form.input_date,
@@ -312,12 +618,34 @@ export default function App() {
           <button className="primary-button" type="submit" disabled={isSaving || !hasSupabaseConfig}>
             {text.add}
           </button>
-        </form>
+          </form>
+        )}
 
         {message && <p className="message">{message}</p>}
 
-        <div className="inventory-table" role="table" aria-label={text.tableLabel}>
+        {activeTab === 'previous' && (
+          <div className="excel-toolbar">
+            <label className="toolbar-file">
+              <span>{text.importCsv}</span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => importPreviousStockCsv(event.target.files?.[0])}
+              />
+            </label>
+            <button type="button" onClick={exportInventoryCsv}>
+              {text.exportCsv}
+            </button>
+            <button type="button" onClick={exportInventoryExcel}>
+              {text.exportExcel}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'inventory' ? (
+          <div className="inventory-table" role="table" aria-label={text.tableLabel}>
           <div className="table-header" role="row">
+            <span role="columnheader">{text.image}</span>
             <span role="columnheader">{text.inputDate}</span>
             <span role="columnheader">{text.wineName}</span>
             <span role="columnheader">{text.incoming}</span>
@@ -339,6 +667,23 @@ export default function App() {
                 <div className="table-row" role="row" key={wine.id}>
                   {isEditing ? (
                     <>
+                      <div className="cell image-cell" data-label={text.image}>
+                        {editForm.image_url ? (
+                          <img
+                            className="thumbnail"
+                            src={editForm.image_url}
+                            alt={`${editForm.wine_name} 이미지`}
+                          />
+                        ) : (
+                          <span className="no-image">{text.noImage}</span>
+                        )}
+                        <input
+                          aria-label={text.image}
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => setEditImageFile(event.target.files?.[0] || null)}
+                        />
+                      </div>
                       <div className="cell" data-label={text.inputDate}>
                         <input
                           aria-label={text.inputDate}
@@ -383,6 +728,9 @@ export default function App() {
                     </>
                   ) : (
                     <>
+                      <span className="cell image-cell" data-label={text.image}>
+                        {renderThumbnail(wine)}
+                      </span>
                       <span className="cell" data-label={text.inputDate}>
                         {wine.input_date}
                       </span>
@@ -424,7 +772,41 @@ export default function App() {
               );
             })
           )}
-        </div>
+          </div>
+        ) : (
+          <div className="inventory-table previous-table" role="table" aria-label={text.previousStockTab}>
+            <div className="previous-header" role="row">
+              <span role="columnheader">{text.wineName}</span>
+              <span role="columnheader">{text.previousStock}</span>
+              <span role="columnheader">{text.incoming}</span>
+              <span role="columnheader">{text.outgoing}</span>
+              <span role="columnheader">{text.stock}</span>
+            </div>
+            {previousStockRows.length === 0 ? (
+              <div className="empty-state">{text.empty}</div>
+            ) : (
+              previousStockRows.map((row) => (
+                <div className="previous-row" role="row" key={row.wine_name}>
+                  <span className="cell wine-name" data-label={text.wineName}>
+                    {row.wine_name}
+                  </span>
+                  <span className="cell number-cell" data-label={text.previousStock}>
+                    {row.previous_stock}
+                  </span>
+                  <span className="cell number-cell" data-label={text.incoming}>
+                    {row.incoming}
+                  </span>
+                  <span className="cell number-cell" data-label={text.outgoing}>
+                    {row.outgoing}
+                  </span>
+                  <strong className="cell stock-cell" data-label={text.stock}>
+                    {row.stock}
+                  </strong>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
