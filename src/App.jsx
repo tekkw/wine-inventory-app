@@ -118,6 +118,27 @@ function downloadFile(fileName, content, type) {
   URL.revokeObjectURL(url);
 }
 
+async function saveInventoryLog({ actionType, wineId, wineName, beforeData, afterData, memo }) {
+  if (!hasSupabaseConfig) return;
+
+  try {
+    const { error } = await supabase.from('inventory_logs').insert({
+      action_type: actionType,
+      wine_id: wineId,
+      wine_name: wineName,
+      before_data: beforeData,
+      after_data: afterData,
+      memo: memo ?? null,
+    });
+
+    if (error) {
+      console.warn('Inventory log save failed:', error.message);
+    }
+  } catch (error) {
+    console.warn('Inventory log save failed:', error);
+  }
+}
+
 export default function App() {
   const [wines, setWines] = useState([]);
   const [form, setForm] = useState(createEmptyForm);
@@ -202,6 +223,13 @@ export default function App() {
     if (error) {
       setMessage(`와인을 추가하지 못했습니다: ${error.message}`);
     } else {
+      await saveInventoryLog({
+        actionType: 'CREATE',
+        wineId: data.id,
+        wineName: data.wine_name,
+        beforeData: null,
+        afterData: data,
+      });
       setWines((current) => [...current, data]);
       setForm(createEmptyForm());
       setShowSuggestions(false);
@@ -231,6 +259,7 @@ export default function App() {
 
   async function updateWine(id) {
     const nextWine = normalizeWine(editForm);
+    const beforeWine = wines.find((wine) => wine.id === id) ?? null;
 
     if (!nextWine.input_date || !nextWine.wine_name) {
       setMessage(text.required);
@@ -248,6 +277,13 @@ export default function App() {
     if (error) {
       setMessage(`와인을 수정하지 못했습니다: ${error.message}`);
     } else {
+      await saveInventoryLog({
+        actionType: 'UPDATE',
+        wineId: data.id,
+        wineName: data.wine_name,
+        beforeData: beforeWine,
+        afterData: data,
+      });
       setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
       cancelEdit();
       setMessage(text.updateSuccess);
@@ -255,19 +291,33 @@ export default function App() {
     setIsSaving(false);
   }
 
-  async function deleteWine(id) {
+  async function deleteWine(wine) {
     if (!window.confirm(text.confirmDelete)) return;
+
+    const deletedAt = new Date().toISOString();
+    const afterData = {
+      ...wine,
+      is_deleted: true,
+      deleted_at: deletedAt,
+    };
 
     setIsSaving(true);
     const { error } = await supabase
       .from('wines')
-      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-      .eq('id', id);
+      .update({ is_deleted: true, deleted_at: deletedAt })
+      .eq('id', wine.id);
 
     if (error) {
       setMessage(`와인을 삭제하지 못했습니다: ${error.message}`);
     } else {
-      setWines((current) => current.filter((wine) => wine.id !== id));
+      await saveInventoryLog({
+        actionType: 'DELETE',
+        wineId: wine.id,
+        wineName: wine.wine_name,
+        beforeData: wine,
+        afterData,
+      });
+      setWines((current) => current.filter((currentWine) => currentWine.id !== wine.id));
       setMessage(text.deleteSuccess);
     }
     setIsSaving(false);
@@ -588,7 +638,7 @@ export default function App() {
                         <button
                           className="danger"
                           type="button"
-                          onClick={() => deleteWine(wine.id)}
+                          onClick={() => deleteWine(wine)}
                           disabled={isSaving || !hasSupabaseConfig}
                         >
                           {text.delete}
