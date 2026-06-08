@@ -148,32 +148,17 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ column: 'input_date', direction: 'desc' });
   const [filters, setFilters] = useState({ input_date: 'all', wine_name: 'all' });
   const [openFilter, setOpenFilter] = useState(null);
 
-  const sortedWines = useMemo(
-    () => {
-      const direction = sortConfig.direction === 'asc' ? 1 : -1;
-      const filteredWines = wines.filter((wine) => {
+  const visibleWines = useMemo(
+    () =>
+      wines.filter((wine) => {
         const matchesDate = filters.input_date === 'all' || wine.input_date === filters.input_date;
         const matchesName = filters.wine_name === 'all' || wine.wine_name === filters.wine_name;
         return matchesDate && matchesName;
-      });
-
-      return [...filteredWines].sort((a, b) => {
-        if (sortConfig.column === 'wine_name') {
-          const nameCompare = String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
-          if (nameCompare !== 0) return nameCompare * direction;
-          return String(b.input_date ?? '').localeCompare(String(a.input_date ?? ''));
-        }
-
-        const dateCompare = String(a.input_date ?? '').localeCompare(String(b.input_date ?? ''));
-        if (dateCompare !== 0) return dateCompare * direction;
-        return String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
-      });
-    },
-    [wines, sortConfig, filters],
+      }),
+    [wines, filters],
   );
 
   const inputDateOptions = useMemo(
@@ -212,18 +197,6 @@ export default function App() {
   useEffect(() => {
     loadWines();
   }, []);
-
-  function changeSort(column) {
-    setSortConfig((current) => ({
-      column,
-      direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  }
-
-  function getSortMark(column) {
-    if (sortConfig.column !== column) return '';
-    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
-  }
 
   function changeFilter(column, value) {
     setFilters((current) => ({ ...current, [column]: value }));
@@ -270,10 +243,11 @@ export default function App() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('wines')
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
+      .select(
+        'id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at, created_at, updated_at',
+      )
       .eq('is_deleted', false)
-      .order('input_date', { ascending: false })
-      .order('wine_name', { ascending: true });
+      .order('updated_at', { ascending: false, nullsFirst: false });
 
     if (error) {
       setMessage(`목록을 불러오지 못했습니다: ${error.message}`);
@@ -295,10 +269,19 @@ export default function App() {
     }
 
     setIsSaving(true);
+    const savedAt = new Date().toISOString();
     const { data, error } = await supabase
       .from('wines')
-      .insert({ ...nextWine, is_deleted: false, deleted_at: null })
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
+      .insert({
+        ...nextWine,
+        is_deleted: false,
+        deleted_at: null,
+        created_at: savedAt,
+        updated_at: savedAt,
+      })
+      .select(
+        'id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at, created_at, updated_at',
+      )
       .single();
 
     if (error) {
@@ -311,7 +294,7 @@ export default function App() {
         beforeData: null,
         afterData: data,
       });
-      setWines((current) => [...current, data]);
+      setWines((current) => [data, ...current]);
       setForm(createEmptyForm());
       setShowSuggestions(false);
       formElement?.reset?.();
@@ -348,11 +331,14 @@ export default function App() {
     }
 
     setIsSaving(true);
+    const updatedAt = new Date().toISOString();
     const { data, error } = await supabase
       .from('wines')
-      .update(nextWine)
+      .update({ ...nextWine, updated_at: updatedAt })
       .eq('id', id)
-      .select('id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at')
+      .select(
+        'id, input_date, wine_name, previous_stock, incoming, outgoing, is_deleted, deleted_at, created_at, updated_at',
+      )
       .single();
 
     if (error) {
@@ -365,7 +351,7 @@ export default function App() {
         beforeData: beforeWine,
         afterData: data,
       });
-      setWines((current) => current.map((wine) => (wine.id === id ? data : wine)));
+      setWines((current) => [data, ...current.filter((wine) => wine.id !== id)]);
       cancelEdit();
       setMessage(text.updateSuccess);
     }
@@ -380,12 +366,13 @@ export default function App() {
       ...wine,
       is_deleted: true,
       deleted_at: deletedAt,
+      updated_at: deletedAt,
     };
 
     setIsSaving(true);
     const { error } = await supabase
       .from('wines')
-      .update({ is_deleted: true, deleted_at: deletedAt })
+      .update({ is_deleted: true, deleted_at: deletedAt, updated_at: deletedAt })
       .eq('id', wine.id);
 
     if (error) {
@@ -517,9 +504,13 @@ export default function App() {
           stockByName[name] = toNumber(row[previousStockIndex]);
         });
 
+        const updatedAt = new Date().toISOString();
         const updatedWines = wines.map((wine) => ({
           ...wine,
           previous_stock: stockByName[wine.wine_name] ?? wine.previous_stock ?? 0,
+          updated_at: Object.prototype.hasOwnProperty.call(stockByName, wine.wine_name)
+            ? updatedAt
+            : wine.updated_at,
         }));
         setWines(updatedWines);
 
@@ -530,10 +521,11 @@ export default function App() {
               .map((wine) =>
                 supabase
                   .from('wines')
-                  .update({ previous_stock: toNumber(wine.previous_stock) })
+                  .update({ previous_stock: toNumber(wine.previous_stock), updated_at: updatedAt })
                   .eq('id', wine.id),
               ),
           );
+          await loadWines();
         }
 
         setMessage(text.importSuccess);
@@ -553,7 +545,7 @@ export default function App() {
       text.outgoing,
       text.stock,
     ];
-    const rows = sortedWines.map((wine) => [
+    const rows = visibleWines.map((wine) => [
       wine.input_date,
       wine.wine_name,
       wine.previous_stock ?? 0,
@@ -618,10 +610,7 @@ export default function App() {
           <div className="table-header" role="row">
             <span role="columnheader">
               <div className="header-filter">
-                <button className="sort-button" type="button" onClick={() => changeSort('input_date')}>
-                  {text.inputDate}
-                  {getSortMark('input_date')}
-                </button>
+                <span className="header-title">{text.inputDate}</span>
                 <button
                   aria-label={`${text.inputDate} 필터`}
                   className={filters.input_date === 'all' ? 'filter-toggle' : 'filter-toggle active'}
@@ -635,10 +624,7 @@ export default function App() {
             </span>
             <span role="columnheader">
               <div className="header-filter">
-                <button className="sort-button" type="button" onClick={() => changeSort('wine_name')}>
-                  {text.wineName}
-                  {getSortMark('wine_name')}
-                </button>
+                <span className="header-title">{text.wineName}</span>
                 <button
                   aria-label={`${text.wineName} 필터`}
                   className={filters.wine_name === 'all' ? 'filter-toggle' : 'filter-toggle active'}
@@ -659,10 +645,10 @@ export default function App() {
 
           {isLoading ? (
             <div className="empty-state">{text.loading}</div>
-          ) : sortedWines.length === 0 ? (
+          ) : visibleWines.length === 0 ? (
             <div className="empty-state">{text.empty}</div>
           ) : (
-            sortedWines.map((wine) => {
+            visibleWines.map((wine) => {
               const currentStock = calculateStock(wine);
               const isEditing = editingId === wine.id;
 
