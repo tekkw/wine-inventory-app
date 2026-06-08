@@ -206,6 +206,7 @@ export default function App() {
 
   async function addWine(event) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     const nextWine = normalizeWine(form);
 
     if (!nextWine.input_date || !nextWine.wine_name) {
@@ -233,7 +234,7 @@ export default function App() {
       setWines((current) => [...current, data]);
       setForm(createEmptyForm());
       setShowSuggestions(false);
-      event.currentTarget.reset();
+      formElement?.reset?.();
       setMessage(text.addSuccess);
     }
     setIsSaving(false);
