@@ -150,6 +150,7 @@ export default function App() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortConfig, setSortConfig] = useState({ column: 'input_date', direction: 'desc' });
   const [filters, setFilters] = useState({ input_date: 'all', wine_name: 'all' });
+  const [openFilter, setOpenFilter] = useState(null);
 
   const sortedWines = useMemo(
     () => {
@@ -226,6 +227,37 @@ export default function App() {
 
   function changeFilter(column, value) {
     setFilters((current) => ({ ...current, [column]: value }));
+    setOpenFilter(null);
+  }
+
+  function toggleFilter(column) {
+    setOpenFilter((current) => (current === column ? null : column));
+  }
+
+  function renderFilterMenu(column, options) {
+    if (openFilter !== column) return null;
+
+    return (
+      <div className="filter-menu" role="menu">
+        <button
+          className={filters[column] === 'all' ? 'filter-option active' : 'filter-option'}
+          type="button"
+          onClick={() => changeFilter(column, 'all')}
+        >
+          전체
+        </button>
+        {options.map((option) => (
+          <button
+            className={filters[column] === option ? 'filter-option active' : 'filter-option'}
+            key={option}
+            type="button"
+            onClick={() => changeFilter(column, option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   async function loadWines() {
@@ -590,19 +622,15 @@ export default function App() {
                   {text.inputDate}
                   {getSortMark('input_date')}
                 </button>
-                <select
+                <button
                   aria-label={`${text.inputDate} 필터`}
-                  className="filter-select"
-                  value={filters.input_date}
-                  onChange={(event) => changeFilter('input_date', event.target.value)}
+                  className={filters.input_date === 'all' ? 'filter-toggle' : 'filter-toggle active'}
+                  type="button"
+                  onClick={() => toggleFilter('input_date')}
                 >
-                  <option value="all">전체</option>
-                  {inputDateOptions.map((date) => (
-                    <option key={date} value={date}>
-                      {date}
-                    </option>
-                  ))}
-                </select>
+                  ▼
+                </button>
+                {renderFilterMenu('input_date', inputDateOptions)}
               </div>
             </span>
             <span role="columnheader">
@@ -611,19 +639,15 @@ export default function App() {
                   {text.wineName}
                   {getSortMark('wine_name')}
                 </button>
-                <select
+                <button
                   aria-label={`${text.wineName} 필터`}
-                  className="filter-select"
-                  value={filters.wine_name}
-                  onChange={(event) => changeFilter('wine_name', event.target.value)}
+                  className={filters.wine_name === 'all' ? 'filter-toggle' : 'filter-toggle active'}
+                  type="button"
+                  onClick={() => toggleFilter('wine_name')}
                 >
-                  <option value="all">전체</option>
-                  {wineNameFilterOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  ▼
+                </button>
+                {renderFilterMenu('wine_name', wineNameFilterOptions)}
               </div>
             </span>
             <span role="columnheader">{text.previousStock}</span>
