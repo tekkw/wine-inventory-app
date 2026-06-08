@@ -148,15 +148,25 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ column: 'input_date', direction: 'desc' });
 
   const sortedWines = useMemo(
-    () =>
-      [...wines].sort((a, b) => {
-        const dateCompare = String(b.input_date).localeCompare(String(a.input_date));
-        if (dateCompare !== 0) return dateCompare;
-        return a.wine_name.localeCompare(b.wine_name, 'ko');
-      }),
-    [wines],
+    () => {
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+
+      return [...wines].sort((a, b) => {
+        if (sortConfig.column === 'wine_name') {
+          const nameCompare = String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
+          if (nameCompare !== 0) return nameCompare * direction;
+          return String(b.input_date ?? '').localeCompare(String(a.input_date ?? ''));
+        }
+
+        const dateCompare = String(a.input_date ?? '').localeCompare(String(b.input_date ?? ''));
+        if (dateCompare !== 0) return dateCompare * direction;
+        return String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
+      });
+    },
+    [wines, sortConfig],
   );
 
   const wineNameSuggestions = useMemo(() => {
@@ -179,6 +189,18 @@ export default function App() {
   useEffect(() => {
     loadWines();
   }, []);
+
+  function changeSort(column) {
+    setSortConfig((current) => ({
+      column,
+      direction: current.column === column && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }
+
+  function getSortMark(column) {
+    if (sortConfig.column !== column) return '';
+    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
+  }
 
   async function loadWines() {
     if (!hasSupabaseConfig) {
@@ -536,8 +558,18 @@ export default function App() {
 
         <div className="inventory-table" role="table" aria-label={text.tableLabel}>
           <div className="table-header" role="row">
-            <span role="columnheader">{text.inputDate}</span>
-            <span role="columnheader">{text.wineName}</span>
+            <span role="columnheader">
+              <button className="sort-button" type="button" onClick={() => changeSort('input_date')}>
+                {text.inputDate}
+                {getSortMark('input_date')}
+              </button>
+            </span>
+            <span role="columnheader">
+              <button className="sort-button" type="button" onClick={() => changeSort('wine_name')}>
+                {text.wineName}
+                {getSortMark('wine_name')}
+              </button>
+            </span>
             <span role="columnheader">{text.previousStock}</span>
             <span role="columnheader">{text.incoming}</span>
             <span role="columnheader">{text.outgoing}</span>

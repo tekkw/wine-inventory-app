@@ -242,6 +242,24 @@ button:disabled {
   border-right: 0;
 }
 
+.sort-button {
+  display: inline-flex;
+  min-height: auto;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.sort-button:hover,
+.sort-button:focus {
+  background: transparent;
+  text-decoration: underline;
+}
+
 .table-row {
   background: #ffffff;
 }
