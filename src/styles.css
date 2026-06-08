@@ -18,7 +18,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -258,6 +259,27 @@ button:disabled {
 .sort-button:focus {
   background: transparent;
   text-decoration: underline;
+}
+
+.header-filter {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-select {
+  width: 76px;
+  min-height: 24px;
+  border: 1px solid #9ca3af;
+  background: #ffffff;
+  color: #111827;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.table-header span:nth-child(2) .filter-select {
+  width: 88px;
 }
 
 .table-row {

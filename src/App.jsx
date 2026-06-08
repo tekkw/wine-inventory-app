@@ -149,12 +149,18 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortConfig, setSortConfig] = useState({ column: 'input_date', direction: 'desc' });
+  const [filters, setFilters] = useState({ input_date: 'all', wine_name: 'all' });
 
   const sortedWines = useMemo(
     () => {
       const direction = sortConfig.direction === 'asc' ? 1 : -1;
+      const filteredWines = wines.filter((wine) => {
+        const matchesDate = filters.input_date === 'all' || wine.input_date === filters.input_date;
+        const matchesName = filters.wine_name === 'all' || wine.wine_name === filters.wine_name;
+        return matchesDate && matchesName;
+      });
 
-      return [...wines].sort((a, b) => {
+      return [...filteredWines].sort((a, b) => {
         if (sortConfig.column === 'wine_name') {
           const nameCompare = String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
           if (nameCompare !== 0) return nameCompare * direction;
@@ -166,7 +172,23 @@ export default function App() {
         return String(a.wine_name ?? '').localeCompare(String(b.wine_name ?? ''), 'ko');
       });
     },
-    [wines, sortConfig],
+    [wines, sortConfig, filters],
+  );
+
+  const inputDateOptions = useMemo(
+    () =>
+      Array.from(new Set(wines.map((wine) => wine.input_date).filter(Boolean))).sort((a, b) =>
+        String(b).localeCompare(String(a)),
+      ),
+    [wines],
+  );
+
+  const wineNameFilterOptions = useMemo(
+    () =>
+      Array.from(new Set(wines.map((wine) => wine.wine_name?.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, 'ko'),
+      ),
+    [wines],
   );
 
   const wineNameSuggestions = useMemo(() => {
@@ -200,6 +222,10 @@ export default function App() {
   function getSortMark(column) {
     if (sortConfig.column !== column) return '';
     return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
+  }
+
+  function changeFilter(column, value) {
+    setFilters((current) => ({ ...current, [column]: value }));
   }
 
   async function loadWines() {
@@ -559,16 +585,46 @@ export default function App() {
         <div className="inventory-table" role="table" aria-label={text.tableLabel}>
           <div className="table-header" role="row">
             <span role="columnheader">
-              <button className="sort-button" type="button" onClick={() => changeSort('input_date')}>
-                {text.inputDate}
-                {getSortMark('input_date')}
-              </button>
+              <div className="header-filter">
+                <button className="sort-button" type="button" onClick={() => changeSort('input_date')}>
+                  {text.inputDate}
+                  {getSortMark('input_date')}
+                </button>
+                <select
+                  aria-label={`${text.inputDate} 필터`}
+                  className="filter-select"
+                  value={filters.input_date}
+                  onChange={(event) => changeFilter('input_date', event.target.value)}
+                >
+                  <option value="all">전체</option>
+                  {inputDateOptions.map((date) => (
+                    <option key={date} value={date}>
+                      {date}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </span>
             <span role="columnheader">
-              <button className="sort-button" type="button" onClick={() => changeSort('wine_name')}>
-                {text.wineName}
-                {getSortMark('wine_name')}
-              </button>
+              <div className="header-filter">
+                <button className="sort-button" type="button" onClick={() => changeSort('wine_name')}>
+                  {text.wineName}
+                  {getSortMark('wine_name')}
+                </button>
+                <select
+                  aria-label={`${text.wineName} 필터`}
+                  className="filter-select"
+                  value={filters.wine_name}
+                  onChange={(event) => changeFilter('wine_name', event.target.value)}
+                >
+                  <option value="all">전체</option>
+                  {wineNameFilterOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </span>
             <span role="columnheader">{text.previousStock}</span>
             <span role="columnheader">{text.incoming}</span>
